@@ -42,6 +42,7 @@ cd committer-agent
 
 The activation script will:
 - Verify it's running from a git submodule
+- Check if already activated (idempotent - safe to run multiple times)
 - Create symlinks from your project root to the agent definitions
 - Verify the activation succeeded
 
@@ -111,14 +112,15 @@ cd committer-agent
 ./activate.sh
 ```
 
-### ".cursor/rules already exists" warning
+### ".cursor/rules already exists" or ".claude already exists" error
 
-**Cause:** Your project already has Cursor rules defined.
+**Cause:** Files/directories exist at these locations but aren't the correct symlinks.
 
-**Options:**
-1. Backup existing rules: `mv .cursor/rules .cursor/rules.backup`
-2. Manually merge the rules
-3. Skip Cursor activation and only activate Claude Code definitions
+**Solution:** The script will provide specific instructions based on what exists:
+- If it's a different symlink: Remove it first with `rm`
+- If it's a file/directory: Backup and remove it with `mv`
+
+**Note:** If the correct symlinks already exist, the script will detect this and skip creation (idempotent behavior).
 
 ### Symlinks not working on Windows
 
@@ -150,9 +152,12 @@ cd committer-agent
 ./deactivate.sh
 ```
 
-This will:
-- Remove the symlinks from your project root
+The deactivation script will:
+- Check activation status (idempotent - safe to run multiple times)
+- Remove symlinks that point to this submodule
+- Skip symlinks pointing elsewhere (safety check)
 - Keep the submodule itself (can be reactivated later)
+- Display instructions for complete submodule removal
 
 ### Remove Submodule
 

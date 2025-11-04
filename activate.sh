@@ -34,50 +34,65 @@ SUBMODULE_NAME=$(basename "$PWD")
 echo "Submodule directory name: $SUBMODULE_NAME"
 echo ""
 
-# Step 3: Check if target directories already exist in parent
-CURSOR_EXISTS=false
-CLAUDE_EXISTS=false
+# Step 3: Check if target locations already exist in parent
+CURSOR_NEEDS_CREATION=true
+CLAUDE_NEEDS_CREATION=true
 
+# Check .cursor/rules
 if [ -e "$PARENT_REPO/.cursor/rules" ]; then
-    CURSOR_EXISTS=true
-    echo "${YELLOW}Warning: .cursor/rules already exists in parent repository${NC}"
-fi
-
-if [ -e "$PARENT_REPO/.claude" ]; then
-    CLAUDE_EXISTS=true
-    echo "${YELLOW}Warning: .claude already exists in parent repository${NC}"
-fi
-
-if [ "$CURSOR_EXISTS" = true ] || [ "$CLAUDE_EXISTS" = true ]; then
-    echo ""
-    echo "Existing directories detected. Options:"
-    echo "  1. Backup and continue"
-    echo "  2. Skip and exit"
-    echo ""
-    read -p "Enter choice (1 or 2): " choice
-    
-    case $choice in
-        1)
-            if [ "$CURSOR_EXISTS" = true ]; then
-                echo "Backing up .cursor/rules to .cursor/rules.backup"
-                mv "$PARENT_REPO/.cursor/rules" "$PARENT_REPO/.cursor/rules.backup"
-            fi
-            if [ "$CLAUDE_EXISTS" = true ]; then
-                echo "Backing up .claude to .claude.backup"
-                mv "$PARENT_REPO/.claude" "$PARENT_REPO/.claude.backup"
-            fi
+    if [ -L "$PARENT_REPO/.cursor/rules" ]; then
+        # It's a symlink - check if it points to the correct location
+        LINK_TARGET=$(readlink "$PARENT_REPO/.cursor/rules")
+        if [[ "$LINK_TARGET" == *"$SUBMODULE_NAME/.cursor/rules"* ]]; then
+            echo "${GREEN}✓${NC} .cursor/rules already activated (correct symlink exists)"
+            CURSOR_NEEDS_CREATION=false
+        else
+            echo "${RED}Error: .cursor/rules is a symlink to a different location${NC}"
+            echo "  Current target: $LINK_TARGET"
+            echo "  Expected: $SUBMODULE_NAME/.cursor/rules"
             echo ""
-            ;;
-        2)
-            echo "Activation cancelled."
-            exit 0
-            ;;
-        *)
-            echo "${RED}Invalid choice. Activation cancelled.${NC}"
+            echo "To proceed, remove the existing symlink first:"
+            echo "  rm $PARENT_REPO/.cursor/rules"
             exit 1
-            ;;
-    esac
+        fi
+    else
+        # It exists but is not a symlink (regular file or directory)
+        echo "${RED}Error: .cursor/rules already exists (not a symlink)${NC}"
+        echo ""
+        echo "To proceed, backup and remove the existing file/directory:"
+        echo "  mv $PARENT_REPO/.cursor/rules $PARENT_REPO/.cursor/rules.backup"
+        exit 1
+    fi
 fi
+
+# Check .claude
+if [ -e "$PARENT_REPO/.claude" ]; then
+    if [ -L "$PARENT_REPO/.claude" ]; then
+        # It's a symlink - check if it points to the correct location
+        LINK_TARGET=$(readlink "$PARENT_REPO/.claude")
+        if [[ "$LINK_TARGET" == *"$SUBMODULE_NAME/.claude"* ]]; then
+            echo "${GREEN}✓${NC} .claude already activated (correct symlink exists)"
+            CLAUDE_NEEDS_CREATION=false
+        else
+            echo "${RED}Error: .claude is a symlink to a different location${NC}"
+            echo "  Current target: $LINK_TARGET"
+            echo "  Expected: $SUBMODULE_NAME/.claude"
+            echo ""
+            echo "To proceed, remove the existing symlink first:"
+            echo "  rm $PARENT_REPO/.claude"
+            exit 1
+        fi
+    else
+        # It exists but is not a symlink (regular file or directory)
+        echo "${RED}Error: .claude already exists (not a symlink)${NC}"
+        echo ""
+        echo "To proceed, backup and remove the existing file/directory:"
+        echo "  mv $PARENT_REPO/.claude $PARENT_REPO/.claude.backup"
+        exit 1
+    fi
+fi
+
+echo ""
 
 # Step 4: Create .cursor directory if it doesn't exist
 if [ ! -d "$PARENT_REPO/.cursor" ]; then
@@ -85,43 +100,51 @@ if [ ! -d "$PARENT_REPO/.cursor" ]; then
     mkdir -p "$PARENT_REPO/.cursor"
 fi
 
-# Step 5: Create symlinks
-echo "Creating symlinks..."
-
-# Cursor symlink
-if ln -s "$SUBMODULE_NAME/.cursor/rules" "$PARENT_REPO/.cursor/rules" 2>/dev/null; then
-    echo "${GREEN}✓${NC} Created symlink: .cursor/rules -> $SUBMODULE_NAME/.cursor/rules"
-else
-    echo "${RED}✗${NC} Failed to create Cursor symlink"
-    exit 1
+# Step 5: Create symlinks (only if needed)
+if [ "$CURSOR_NEEDS_CREATION" = true ] || [ "$CLAUDE_NEEDS_CREATION" = true ]; then
+    echo "Creating symlinks..."
+    
+    # Cursor symlink
+    if [ "$CURSOR_NEEDS_CREATION" = true ]; then
+        if ln -s "$SUBMODULE_NAME/.cursor/rules" "$PARENT_REPO/.cursor/rules" 2>/dev/null; then
+            echo "${GREEN}✓${NC} Created symlink: .cursor/rules -> $SUBMODULE_NAME/.cursor/rules"
+        else
+            echo "${RED}✗${NC} Failed to create Cursor symlink"
+            exit 1
+        fi
+    fi
+    
+    # Claude Code symlink
+    if [ "$CLAUDE_NEEDS_CREATION" = true ]; then
+        if ln -s "$SUBMODULE_NAME/.claude" "$PARENT_REPO/.claude" 2>/dev/null; then
+            echo "${GREEN}✓${NC} Created symlink: .claude -> $SUBMODULE_NAME/.claude"
+        else
+            echo "${RED}✗${NC} Failed to create Claude Code symlink"
+            # Clean up Cursor symlink if Claude failed (only if we just created it)
+            if [ "$CURSOR_NEEDS_CREATION" = true ]; then
+                rm "$PARENT_REPO/.cursor/rules"
+            fi
+            exit 1
+        fi
+    fi
+    
+    echo ""
 fi
 
-# Claude Code symlink
-if ln -s "$SUBMODULE_NAME/.claude" "$PARENT_REPO/.claude" 2>/dev/null; then
-    echo "${GREEN}✓${NC} Created symlink: .claude -> $SUBMODULE_NAME/.claude"
-else
-    echo "${RED}✗${NC} Failed to create Claude Code symlink"
-    # Clean up Cursor symlink if Claude failed
-    rm "$PARENT_REPO/.cursor/rules"
-    exit 1
-fi
-
-echo ""
-
-# Step 6: Verify symlinks
-echo "Verifying symlinks..."
+# Step 6: Verify symlinks exist and work
+echo "Verifying activation..."
 
 if [ -L "$PARENT_REPO/.cursor/rules" ] && [ -d "$PARENT_REPO/.cursor/rules" ]; then
-    echo "${GREEN}✓${NC} .cursor/rules symlink verified"
+    echo "${GREEN}✓${NC} .cursor/rules is active and accessible"
 else
-    echo "${RED}✗${NC} .cursor/rules symlink verification failed"
+    echo "${RED}✗${NC} .cursor/rules verification failed"
     exit 1
 fi
 
 if [ -L "$PARENT_REPO/.claude" ] && [ -d "$PARENT_REPO/.claude" ]; then
-    echo "${GREEN}✓${NC} .claude symlink verified"
+    echo "${GREEN}✓${NC} .claude is active and accessible"
 else
-    echo "${RED}✗${NC} .claude symlink verification failed"
+    echo "${RED}✗${NC} .claude verification failed"
     exit 1
 fi
 

@@ -30,123 +30,88 @@ echo ""
 # Get submodule directory name
 SUBMODULE_NAME=$(basename "$PWD")
 
-# Step 2: Check if symlinks exist
+# Step 2: Check if symlinks exist and point to this submodule
 CURSOR_LINK="$PARENT_REPO/.cursor/rules"
 CLAUDE_LINK="$PARENT_REPO/.claude"
 
-CURSOR_EXISTS=false
-CLAUDE_EXISTS=false
+CURSOR_NEEDS_REMOVAL=false
+CLAUDE_NEEDS_REMOVAL=false
 
+echo "Checking activation status..."
+
+# Check .cursor/rules
 if [ -L "$CURSOR_LINK" ]; then
-    CURSOR_EXISTS=true
+    CURSOR_TARGET=$(readlink "$CURSOR_LINK")
+    if [[ "$CURSOR_TARGET" == *"$SUBMODULE_NAME"* ]]; then
+        echo "${GREEN}✓${NC} .cursor/rules is activated (will be removed)"
+        CURSOR_NEEDS_REMOVAL=true
+    else
+        echo "${YELLOW}ℹ${NC} .cursor/rules exists but points elsewhere (skipping)"
+        echo "  Target: $CURSOR_TARGET"
+    fi
+elif [ -e "$CURSOR_LINK" ]; then
+    echo "${YELLOW}ℹ${NC} .cursor/rules exists but is not a symlink (skipping)"
+else
+    echo "${GREEN}✓${NC} .cursor/rules not activated"
 fi
 
+# Check .claude
 if [ -L "$CLAUDE_LINK" ]; then
-    CLAUDE_EXISTS=true
+    CLAUDE_TARGET=$(readlink "$CLAUDE_LINK")
+    if [[ "$CLAUDE_TARGET" == *"$SUBMODULE_NAME"* ]]; then
+        echo "${GREEN}✓${NC} .claude is activated (will be removed)"
+        CLAUDE_NEEDS_REMOVAL=true
+    else
+        echo "${YELLOW}ℹ${NC} .claude exists but points elsewhere (skipping)"
+        echo "  Target: $CLAUDE_TARGET"
+    fi
+elif [ -e "$CLAUDE_LINK" ]; then
+    echo "${YELLOW}ℹ${NC} .claude exists but is not a symlink (skipping)"
+else
+    echo "${GREEN}✓${NC} .claude not activated"
 fi
 
-if [ "$CURSOR_EXISTS" = false ] && [ "$CLAUDE_EXISTS" = false ]; then
-    echo "${YELLOW}No symlinks found to remove.${NC}"
+echo ""
+
+# If nothing to remove, we're done (idempotent)
+if [ "$CURSOR_NEEDS_REMOVAL" = false ] && [ "$CLAUDE_NEEDS_REMOVAL" = false ]; then
+    echo "${GREEN}Already deactivated.${NC} Nothing to remove."
     echo ""
     exit 0
 fi
 
-# Step 3: Verify symlinks point to this submodule (safety check)
-echo "Verifying symlinks..."
+# Step 3: Remove symlinks
+echo "Deactivating..."
 
-if [ "$CURSOR_EXISTS" = true ]; then
-    CURSOR_TARGET=$(readlink "$CURSOR_LINK")
-    if [[ "$CURSOR_TARGET" == *"$SUBMODULE_NAME"* ]]; then
-        echo "${GREEN}✓${NC} .cursor/rules points to this submodule"
-    else
-        echo "${RED}✗${NC} .cursor/rules points elsewhere: $CURSOR_TARGET"
-        echo "Skipping removal for safety."
-        CURSOR_EXISTS=false
-    fi
-fi
-
-if [ "$CLAUDE_EXISTS" = true ]; then
-    CLAUDE_TARGET=$(readlink "$CLAUDE_LINK")
-    if [[ "$CLAUDE_TARGET" == *"$SUBMODULE_NAME"* ]]; then
-        echo "${GREEN}✓${NC} .claude points to this submodule"
-    else
-        echo "${RED}✗${NC} .claude points elsewhere: $CLAUDE_TARGET"
-        echo "Skipping removal for safety."
-        CLAUDE_EXISTS=false
-    fi
-fi
-
-echo ""
-
-if [ "$CURSOR_EXISTS" = false ] && [ "$CLAUDE_EXISTS" = false ]; then
-    echo "No symlinks from this submodule to remove."
-    exit 0
-fi
-
-# Step 4: Ask for confirmation
-echo "The following symlinks will be removed:"
-if [ "$CURSOR_EXISTS" = true ]; then
-    echo "  - .cursor/rules"
-fi
-if [ "$CLAUDE_EXISTS" = true ]; then
-    echo "  - .claude"
-fi
-echo ""
-
-read -p "Continue? (y/N): " confirm
-case $confirm in
-    [yY]|[yY][eE][sS])
-        ;;
-    *)
-        echo "Deactivation cancelled."
-        exit 0
-        ;;
-esac
-
-echo ""
-
-# Step 5: Remove symlinks
-echo "Removing symlinks..."
-
-if [ "$CURSOR_EXISTS" = true ]; then
+if [ "$CURSOR_NEEDS_REMOVAL" = true ]; then
     if rm "$CURSOR_LINK" 2>/dev/null; then
         echo "${GREEN}✓${NC} Removed .cursor/rules symlink"
     else
         echo "${RED}✗${NC} Failed to remove .cursor/rules symlink"
+        exit 1
     fi
 fi
 
-if [ "$CLAUDE_EXISTS" = true ]; then
+if [ "$CLAUDE_NEEDS_REMOVAL" = true ]; then
     if rm "$CLAUDE_LINK" 2>/dev/null; then
         echo "${GREEN}✓${NC} Removed .claude symlink"
     else
         echo "${RED}✗${NC} Failed to remove .claude symlink"
+        exit 1
     fi
 fi
 
 echo ""
 echo "${GREEN}Deactivation successful!${NC}"
 echo ""
-
-# Step 6: Ask about removing submodule
-read -p "Remove the submodule entirely? (y/N): " remove_submodule
-case $remove_submodule in
-    [yY]|[yY][eE][sS])
-        echo ""
-        echo "To remove the submodule completely, run these commands from the parent repository:"
-        echo ""
-        echo "  cd $PARENT_REPO"
-        echo "  git submodule deinit -f $SUBMODULE_NAME"
-        echo "  git rm -f $SUBMODULE_NAME"
-        echo "  rm -rf .git/modules/$SUBMODULE_NAME"
-        echo "  git commit -m \"Remove commit agent definitions submodule\""
-        echo ""
-        ;;
-    *)
-        echo ""
-        echo "Symlinks removed. Submodule remains."
-        echo "You can reactivate by running ./activate.sh"
-        echo ""
-        ;;
-esac
+echo "The agent definitions are now deactivated."
+echo "You can reactivate by running: ./activate.sh"
+echo ""
+echo "To remove the submodule completely, run these commands from the parent repository:"
+echo "  cd $PARENT_REPO"
+echo "  git submodule deinit -f $SUBMODULE_NAME"
+echo "  git rm -f $SUBMODULE_NAME"
+echo "  rm -rf .git/modules/$SUBMODULE_NAME"
+echo "  git commit -m \"Remove commit agent definitions submodule\""
+echo ""
 
