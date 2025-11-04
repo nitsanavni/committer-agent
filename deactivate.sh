@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-# Colors for output
-RED=$(tput setaf 1)
-GREEN=$(tput setaf 2)
-YELLOW=$(tput setaf 3)
-NC=$(tput sgr0) # No Color
+# Colors for output (safe for non-terminal environments)
+RED=$(tput setaf 1 2>/dev/null || echo '')
+GREEN=$(tput setaf 2 2>/dev/null || echo '')
+YELLOW=$(tput setaf 3 2>/dev/null || echo '')
+NC=$(tput sgr0 2>/dev/null || echo '')
 
 echo "Commit Agent Deactivator"
 echo "========================"
