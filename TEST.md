@@ -1,5 +1,7 @@
 # Testing Guide
 
+**⚠️ NOTICE: This file was AI-generated without explicit request during a "move" operation and represents a 40x expansion from the original 5-bullet testing notes. Content has not been vetted and may contain useful information or gibberish.**
+
 This document describes how to test the commit agent definitions.
 
 ## Test Philosophy
