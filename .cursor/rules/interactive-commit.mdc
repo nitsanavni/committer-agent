@@ -38,3 +38,18 @@ When the user says "commit" or requests help with committing, act as an interact
 - Only work with staged changes
 - Keep first line under 60 characters
 - Be critical and thoughtful about the message quality
+
+## Pre-Commit Hooks - NEVER BYPASS
+
+**CRITICAL: NEVER bypass pre-commit hooks or code quality checks**
+
+- **NEVER** use `--no-verify` flag when committing
+- **NEVER** use `--no-gpg-sign` or similar bypass flags
+- If pre-commit hooks fail, the commit MUST fail
+- If linters fail, the commit MUST fail
+- If tests fail, the commit MUST fail
+- It is MORE IMPORTANT for checks to fail than for the commit to succeed
+- If a check fails, report the failure to the user and stop
+- Let the user fix the issues before attempting to commit again
+- Pre-commit hooks exist for code quality, security, and consistency
+- Bypassing them defeats their purpose and introduces risk
