@@ -7,7 +7,7 @@ This guide explains how to install the commit agent definitions in your projects
 Installation involves two steps:
 
 1. **Add Submodule** - Add this repository as a git submodule to your project
-2. **Activate** - Create symlinks from your project root to the agent definition directories
+2. **Activate** - Create symlinks from your project root to the agent definition files
 
 This approach allows you to:
 - Keep agent definitions in sync across multiple projects
@@ -28,8 +28,8 @@ This approach allows you to:
 **Step 1: Add Submodule**
 
 ```bash
-cd /path/to/your/project
-git submodule add https://github.com/yourusername/committer-agent.git
+cd /path/to/your/project &&
+git submodule add https://github.com/nitsanavni/committer-agent.git &&
 git submodule update --init
 ```
 
@@ -197,7 +197,7 @@ Windows users may encounter issues with symlinks. If symlinks don't work:
    - Work within the Linux environment
 
 3. **Copy instead of symlink:**
-   - Manual approach: Copy directories instead of creating symlinks
+   - Manual approach: Copy files instead of creating symlinks
    - Trade-off: Updates require manual re-copying
 
 ## Next Steps

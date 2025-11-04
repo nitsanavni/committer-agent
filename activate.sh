@@ -34,119 +34,103 @@ SUBMODULE_NAME=$(basename "$PWD")
 echo "Submodule directory name: $SUBMODULE_NAME"
 echo ""
 
-# Step 3: Check if target locations already exist in parent
-CURSOR_NEEDS_CREATION=true
-CLAUDE_NEEDS_CREATION=true
+# Step 3: Define agent files to symlink
+declare -A AGENT_FILES
+AGENT_FILES[".claude/commands/commit.md"]="../../$SUBMODULE_NAME/.claude/commands/commit.md"
+AGENT_FILES[".claude/agents/committer.md"]="../../$SUBMODULE_NAME/.claude/agents/committer.md"
+AGENT_FILES[".cursor/rules/interactive-commit.mdc"]="../../$SUBMODULE_NAME/.cursor/rules/interactive-commit.mdc"
+AGENT_FILES[".cursor/rules/autonomous-committer.mdc"]="../../$SUBMODULE_NAME/.cursor/rules/autonomous-committer.mdc"
 
-# Check .cursor/rules
-if [ -e "$PARENT_REPO/.cursor/rules" ]; then
-    if [ -L "$PARENT_REPO/.cursor/rules" ]; then
-        # It's a symlink - check if it points to the correct location
-        LINK_TARGET=$(readlink "$PARENT_REPO/.cursor/rules")
-        if [[ "$LINK_TARGET" == *"$SUBMODULE_NAME/.cursor/rules"* ]]; then
-            echo "${GREEN}✓${NC} .cursor/rules already activated (correct symlink exists)"
-            CURSOR_NEEDS_CREATION=false
+# Track which files need creation
+declare -A FILES_NEED_CREATION
+
+# Check each file
+for TARGET_FILE in "${!AGENT_FILES[@]}"; do
+    FULL_PATH="$PARENT_REPO/$TARGET_FILE"
+    EXPECTED_LINK="${AGENT_FILES[$TARGET_FILE]}"
+    
+    if [ -e "$FULL_PATH" ]; then
+        if [ -L "$FULL_PATH" ]; then
+            # It's a symlink - check if it points to the correct location
+            LINK_TARGET=$(readlink "$FULL_PATH")
+            if [[ "$LINK_TARGET" == "$EXPECTED_LINK" ]]; then
+                echo "${GREEN}✓${NC} $TARGET_FILE already activated (correct symlink exists)"
+                FILES_NEED_CREATION[$TARGET_FILE]=false
+            else
+                echo "${RED}Error: $TARGET_FILE is a symlink to a different location${NC}"
+                echo "  Current target: $LINK_TARGET"
+                echo "  Expected: $EXPECTED_LINK"
+                echo ""
+                echo "To proceed, remove the existing symlink first:"
+                echo "  rm $FULL_PATH"
+                exit 1
+            fi
         else
-            echo "${RED}Error: .cursor/rules is a symlink to a different location${NC}"
-            echo "  Current target: $LINK_TARGET"
-            echo "  Expected: $SUBMODULE_NAME/.cursor/rules"
+            # It exists but is not a symlink (regular file or directory)
+            echo "${RED}Error: $TARGET_FILE already exists (not a symlink)${NC}"
             echo ""
-            echo "To proceed, remove the existing symlink first:"
-            echo "  rm $PARENT_REPO/.cursor/rules"
+            echo "To proceed, backup and remove the existing file/directory:"
+            echo "  mv $FULL_PATH ${FULL_PATH}.backup"
             exit 1
         fi
     else
-        # It exists but is not a symlink (regular file or directory)
-        echo "${RED}Error: .cursor/rules already exists (not a symlink)${NC}"
-        echo ""
-        echo "To proceed, backup and remove the existing file/directory:"
-        echo "  mv $PARENT_REPO/.cursor/rules $PARENT_REPO/.cursor/rules.backup"
-        exit 1
+        FILES_NEED_CREATION[$TARGET_FILE]=true
     fi
-fi
-
-# Check .claude
-if [ -e "$PARENT_REPO/.claude" ]; then
-    if [ -L "$PARENT_REPO/.claude" ]; then
-        # It's a symlink - check if it points to the correct location
-        LINK_TARGET=$(readlink "$PARENT_REPO/.claude")
-        if [[ "$LINK_TARGET" == *"$SUBMODULE_NAME/.claude"* ]]; then
-            echo "${GREEN}✓${NC} .claude already activated (correct symlink exists)"
-            CLAUDE_NEEDS_CREATION=false
-        else
-            echo "${RED}Error: .claude is a symlink to a different location${NC}"
-            echo "  Current target: $LINK_TARGET"
-            echo "  Expected: $SUBMODULE_NAME/.claude"
-            echo ""
-            echo "To proceed, remove the existing symlink first:"
-            echo "  rm $PARENT_REPO/.claude"
-            exit 1
-        fi
-    else
-        # It exists but is not a symlink (regular file or directory)
-        echo "${RED}Error: .claude already exists (not a symlink)${NC}"
-        echo ""
-        echo "To proceed, backup and remove the existing file/directory:"
-        echo "  mv $PARENT_REPO/.claude $PARENT_REPO/.claude.backup"
-        exit 1
-    fi
-fi
+done
 
 echo ""
 
-# Step 4: Create .cursor directory if it doesn't exist
-if [ ! -d "$PARENT_REPO/.cursor" ]; then
-    echo "Creating .cursor directory..."
-    mkdir -p "$PARENT_REPO/.cursor"
-fi
+# Step 4: Create parent directories if they don't exist
+echo "Creating parent directories..."
+mkdir -p "$PARENT_REPO/.claude/commands"
+mkdir -p "$PARENT_REPO/.claude/agents"
+mkdir -p "$PARENT_REPO/.cursor/rules"
+echo ""
 
 # Step 5: Create symlinks (only if needed)
-if [ "$CURSOR_NEEDS_CREATION" = true ] || [ "$CLAUDE_NEEDS_CREATION" = true ]; then
-    echo "Creating symlinks..."
-    
-    # Cursor symlink (needs ../ since the symlink is inside .cursor directory)
-    if [ "$CURSOR_NEEDS_CREATION" = true ]; then
-        if ln -s "../$SUBMODULE_NAME/.cursor/rules" "$PARENT_REPO/.cursor/rules" 2>/dev/null; then
-            echo "${GREEN}✓${NC} Created symlink: .cursor/rules -> ../$SUBMODULE_NAME/.cursor/rules"
+CREATED_FILES=()
+ANY_CREATED=false
+
+for TARGET_FILE in "${!AGENT_FILES[@]}"; do
+    if [ "${FILES_NEED_CREATION[$TARGET_FILE]}" = true ]; then
+        if [ "$ANY_CREATED" = false ]; then
+            echo "Creating symlinks..."
+            ANY_CREATED=true
+        fi
+        
+        FULL_PATH="$PARENT_REPO/$TARGET_FILE"
+        LINK_TARGET="${AGENT_FILES[$TARGET_FILE]}"
+        
+        if ln -s "$LINK_TARGET" "$FULL_PATH" 2>/dev/null; then
+            echo "${GREEN}✓${NC} Created symlink: $TARGET_FILE -> $LINK_TARGET"
+            CREATED_FILES+=("$FULL_PATH")
         else
-            echo "${RED}✗${NC} Failed to create Cursor symlink"
+            echo "${RED}✗${NC} Failed to create symlink: $TARGET_FILE"
+            # Clean up any symlinks we created before failing
+            for CREATED in "${CREATED_FILES[@]}"; do
+                rm "$CREATED"
+            done
             exit 1
         fi
     fi
-    
-    # Claude Code symlink
-    if [ "$CLAUDE_NEEDS_CREATION" = true ]; then
-        if ln -s "$SUBMODULE_NAME/.claude" "$PARENT_REPO/.claude" 2>/dev/null; then
-            echo "${GREEN}✓${NC} Created symlink: .claude -> $SUBMODULE_NAME/.claude"
-        else
-            echo "${RED}✗${NC} Failed to create Claude Code symlink"
-            # Clean up Cursor symlink if Claude failed (only if we just created it)
-            if [ "$CURSOR_NEEDS_CREATION" = true ]; then
-                rm "$PARENT_REPO/.cursor/rules"
-            fi
-            exit 1
-        fi
-    fi
-    
+done
+
+if [ "$ANY_CREATED" = true ]; then
     echo ""
 fi
 
 # Step 6: Verify symlinks exist and work
 echo "Verifying activation..."
 
-if [ -L "$PARENT_REPO/.cursor/rules" ] && [ -d "$PARENT_REPO/.cursor/rules" ]; then
-    echo "${GREEN}✓${NC} .cursor/rules is active and accessible"
-else
-    echo "${RED}✗${NC} .cursor/rules verification failed"
-    exit 1
-fi
-
-if [ -L "$PARENT_REPO/.claude" ] && [ -d "$PARENT_REPO/.claude" ]; then
-    echo "${GREEN}✓${NC} .claude is active and accessible"
-else
-    echo "${RED}✗${NC} .claude verification failed"
-    exit 1
-fi
+for TARGET_FILE in "${!AGENT_FILES[@]}"; do
+    FULL_PATH="$PARENT_REPO/$TARGET_FILE"
+    if [ -L "$FULL_PATH" ] && [ -f "$FULL_PATH" ]; then
+        echo "${GREEN}✓${NC} $TARGET_FILE is active and accessible"
+    else
+        echo "${RED}✗${NC} $TARGET_FILE verification failed"
+        exit 1
+    fi
+done
 
 # Step 7: Success message
 echo ""
@@ -155,7 +139,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Commit the setup:"
 echo "     cd $PARENT_REPO"
-echo "     git add .gitmodules $SUBMODULE_NAME .cursor/rules .claude"
+echo "     git add .gitmodules $SUBMODULE_NAME .claude .cursor"
 echo "     git commit -m \"Add and activate commit agent definitions\""
 echo ""
 echo "  2. Test the agents:"

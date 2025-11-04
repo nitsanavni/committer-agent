@@ -30,51 +30,42 @@ echo ""
 # Get submodule directory name
 SUBMODULE_NAME=$(basename "$PWD")
 
-# Step 2: Check if symlinks exist and point to this submodule
-CURSOR_LINK="$PARENT_REPO/.cursor/rules"
-CLAUDE_LINK="$PARENT_REPO/.claude"
+# Step 2: Define agent files to check
+declare -a AGENT_FILES=(
+    ".claude/commands/commit.md"
+    ".claude/agents/committer.md"
+    ".cursor/rules/interactive-commit.mdc"
+    ".cursor/rules/autonomous-committer.mdc"
+)
 
-CURSOR_NEEDS_REMOVAL=false
-CLAUDE_NEEDS_REMOVAL=false
+# Track which files need removal
+declare -a FILES_TO_REMOVE=()
 
 echo "Checking activation status..."
 
-# Check .cursor/rules
-if [ -L "$CURSOR_LINK" ]; then
-    CURSOR_TARGET=$(readlink "$CURSOR_LINK")
-    if [[ "$CURSOR_TARGET" == *"$SUBMODULE_NAME"* ]]; then
-        echo "${GREEN}✓${NC} .cursor/rules is activated (will be removed)"
-        CURSOR_NEEDS_REMOVAL=true
+for TARGET_FILE in "${AGENT_FILES[@]}"; do
+    FULL_PATH="$PARENT_REPO/$TARGET_FILE"
+    
+    if [ -L "$FULL_PATH" ]; then
+        LINK_TARGET=$(readlink "$FULL_PATH")
+        if [[ "$LINK_TARGET" == *"$SUBMODULE_NAME"* ]]; then
+            echo "${GREEN}✓${NC} $TARGET_FILE is activated (will be removed)"
+            FILES_TO_REMOVE+=("$FULL_PATH")
+        else
+            echo "${YELLOW}ℹ${NC} $TARGET_FILE exists but points elsewhere (skipping)"
+            echo "  Target: $LINK_TARGET"
+        fi
+    elif [ -e "$FULL_PATH" ]; then
+        echo "${YELLOW}ℹ${NC} $TARGET_FILE exists but is not a symlink (skipping)"
     else
-        echo "${YELLOW}ℹ${NC} .cursor/rules exists but points elsewhere (skipping)"
-        echo "  Target: $CURSOR_TARGET"
+        echo "${GREEN}✓${NC} $TARGET_FILE not activated"
     fi
-elif [ -e "$CURSOR_LINK" ]; then
-    echo "${YELLOW}ℹ${NC} .cursor/rules exists but is not a symlink (skipping)"
-else
-    echo "${GREEN}✓${NC} .cursor/rules not activated"
-fi
-
-# Check .claude
-if [ -L "$CLAUDE_LINK" ]; then
-    CLAUDE_TARGET=$(readlink "$CLAUDE_LINK")
-    if [[ "$CLAUDE_TARGET" == *"$SUBMODULE_NAME"* ]]; then
-        echo "${GREEN}✓${NC} .claude is activated (will be removed)"
-        CLAUDE_NEEDS_REMOVAL=true
-    else
-        echo "${YELLOW}ℹ${NC} .claude exists but points elsewhere (skipping)"
-        echo "  Target: $CLAUDE_TARGET"
-    fi
-elif [ -e "$CLAUDE_LINK" ]; then
-    echo "${YELLOW}ℹ${NC} .claude exists but is not a symlink (skipping)"
-else
-    echo "${GREEN}✓${NC} .claude not activated"
-fi
+done
 
 echo ""
 
 # If nothing to remove, we're done (idempotent)
-if [ "$CURSOR_NEEDS_REMOVAL" = false ] && [ "$CLAUDE_NEEDS_REMOVAL" = false ]; then
+if [ ${#FILES_TO_REMOVE[@]} -eq 0 ]; then
     echo "${GREEN}Already deactivated.${NC} Nothing to remove."
     echo ""
     exit 0
@@ -83,23 +74,16 @@ fi
 # Step 3: Remove symlinks
 echo "Deactivating..."
 
-if [ "$CURSOR_NEEDS_REMOVAL" = true ]; then
-    if rm "$CURSOR_LINK" 2>/dev/null; then
-        echo "${GREEN}✓${NC} Removed .cursor/rules symlink"
+for FILE_PATH in "${FILES_TO_REMOVE[@]}"; do
+    if rm "$FILE_PATH" 2>/dev/null; then
+        # Get relative path from parent repo for display
+        REL_PATH="${FILE_PATH#$PARENT_REPO/}"
+        echo "${GREEN}✓${NC} Removed $REL_PATH symlink"
     else
-        echo "${RED}✗${NC} Failed to remove .cursor/rules symlink"
+        echo "${RED}✗${NC} Failed to remove symlink: $FILE_PATH"
         exit 1
     fi
-fi
-
-if [ "$CLAUDE_NEEDS_REMOVAL" = true ]; then
-    if rm "$CLAUDE_LINK" 2>/dev/null; then
-        echo "${GREEN}✓${NC} Removed .claude symlink"
-    else
-        echo "${RED}✗${NC} Failed to remove .claude symlink"
-        exit 1
-    fi
-fi
+done
 
 echo ""
 echo "${GREEN}Deactivation successful!${NC}"
