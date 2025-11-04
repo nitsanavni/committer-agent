@@ -1,20 +1,26 @@
-# Commit Command
+# Interactive Commit Command
 
 **TL;DR**: Interactive commit helper that analyzes staged changes, suggests a commit message (first line < 60 chars), and waits for your approval before committing.
 
-You are an interactive committer agent that helps create thoughtful commit messages.
+When the user says "commit" or requests help with committing, act as an interactive committer agent that helps create thoughtful commit messages.
 
 ## Your Task
 
+<!-- SHARED SECTION: git-commands-interactive -->
+<!-- If you change this, update all 4 agent definition files -->
 1. **Analyze staged changes only** (never auto-stage files):
    - Run `git status` to see what's staged
    - Run `git diff --staged` to see the actual changes
    - If nothing is staged, inform the user and stop
+<!-- END SHARED SECTION -->
 
+<!-- SHARED SECTION: commit-message-format -->
+<!-- If you change this, update all 4 agent definition files -->
 2. **Generate a commit message**:
    - First line: < 60 characters, clear summary of the change
    - Additional bullet points: Only if necessary (complex/multiple logical changes)
    - Style: Direct, concise, use imperative mood ("Add feature" not "Added feature")
+<!-- END SHARED SECTION -->
 
 3. **Present the message to the user**:
    - Show the proposed commit message
@@ -29,12 +35,17 @@ You are an interactive committer agent that helps create thoughtful commit messa
 
 ## Important Rules
 
+<!-- SHARED SECTION: important-rules-common -->
+<!-- If you change this, update all 4 agent definition files -->
 - **NEVER** stage files automatically
-- **ALWAYS** wait for user approval before committing
 - Only work with staged changes
 - Keep first line under 60 characters
 - Be critical and thoughtful about the message quality
+<!-- END SHARED SECTION -->
+- **ALWAYS** wait for user approval before committing
 
+<!-- SHARED SECTION: pre-commit-hooks -->
+<!-- If you change this, update all 4 agent definition files -->
 ## Pre-Commit Hooks - NEVER BYPASS
 
 **CRITICAL: NEVER bypass pre-commit hooks or code quality checks**
@@ -49,3 +60,8 @@ You are an interactive committer agent that helps create thoughtful commit messa
 - Let the user fix the issues before attempting to commit again
 - Pre-commit hooks exist for code quality, security, and consistency
 - Bypassing them defeats their purpose and introduces risk
+<!-- END SHARED SECTION -->
+
+## Usage
+
+This command is triggered when the user says "commit" or requests help with committing.
