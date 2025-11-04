@@ -27,43 +27,16 @@ This repository provides agent definitions that help create high-quality git com
 - Requires all linters and tests to pass
 - Code quality over successful commits
 
-## Quick Start
+## Installation
 
-### Installation via Git Submodule
+See [INSTALL.md](INSTALL.md) for complete installation instructions.
 
-**Step 1: Add Submodule**
+**Quick overview:**
+1. Add this repository as a git submodule to your project
+2. Run `./activate.sh` to create symlinks
+3. Commit the setup
 
-```bash
-cd /path/to/your/project
-git submodule add https://github.com/yourusername/committer-agent.git
-```
-
-**Step 2: Activate**
-
-```bash
-cd committer-agent
-./activate.sh
-```
-
-**Step 3: Commit the Setup**
-
-```bash
-cd ..
-git add .gitmodules committer-agent .cursor .claude
-git commit -m "Add and activate commit agent definitions"
-```
-
-**Test it:**
-
-```bash
-# Stage some files
-git add file.txt
-
-# In Cursor: Say "commit" in chat
-# In Claude Code: Type "/commit" in chat
-```
-
-For detailed instructions, see [INSTALL.md](INSTALL.md).
+The agents will then be available in Cursor and Claude Code.
 
 ## Usage
 
@@ -158,19 +131,18 @@ Using git submodules with symlinks (activation) allows:
 
 ## Documentation
 
-- [INSTALL.md](INSTALL.md) - Detailed installation instructions
+- [INSTALL.md](INSTALL.md) - Complete installation guide
+- [TEST.md](TEST.md) - Testing procedures and checklist
 - [SHARED-SECTIONS.md](SHARED-SECTIONS.md) - Maintaining consistency between agent files
-- [plan.md](plan.md) - Project planning and testing notes
+- [TODO.md](TODO.md) - Feature requests and future enhancements
 
 ## Testing
 
-See [plan.md](plan.md) for the testing plan.
-
-Tests to verify:
-- Agents can be called/executed
-- Agents adhere to commit rules (< 60 chars, imperative mood)
-- Pre-commit hooks are never bypassed
-- No files are auto-staged
+See [TEST.md](TEST.md) for comprehensive testing guide including:
+- Manual test procedures
+- Edge cases to verify
+- Test checklist
+- Automated testing ideas
 
 ## Contributing
 
