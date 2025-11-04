@@ -104,10 +104,10 @@ fi
 if [ "$CURSOR_NEEDS_CREATION" = true ] || [ "$CLAUDE_NEEDS_CREATION" = true ]; then
     echo "Creating symlinks..."
     
-    # Cursor symlink
+    # Cursor symlink (needs ../ since the symlink is inside .cursor directory)
     if [ "$CURSOR_NEEDS_CREATION" = true ]; then
-        if ln -s "$SUBMODULE_NAME/.cursor/rules" "$PARENT_REPO/.cursor/rules" 2>/dev/null; then
-            echo "${GREEN}✓${NC} Created symlink: .cursor/rules -> $SUBMODULE_NAME/.cursor/rules"
+        if ln -s "../$SUBMODULE_NAME/.cursor/rules" "$PARENT_REPO/.cursor/rules" 2>/dev/null; then
+            echo "${GREEN}✓${NC} Created symlink: .cursor/rules -> ../$SUBMODULE_NAME/.cursor/rules"
         else
             echo "${RED}✗${NC} Failed to create Cursor symlink"
             exit 1
