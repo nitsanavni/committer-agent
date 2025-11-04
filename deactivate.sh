@@ -30,8 +30,8 @@ echo ""
 # Get submodule directory name
 SUBMODULE_NAME=$(basename "$PWD")
 
-# Step 2: Define agent files to check
-declare -a AGENT_FILES=(
+# Step 2: Define agent files to check (bash 3.2 compatible)
+TARGET_FILES=(
     ".claude/commands/commit.md"
     ".claude/agents/committer.md"
     ".cursor/rules/interactive-commit.mdc"
@@ -39,11 +39,11 @@ declare -a AGENT_FILES=(
 )
 
 # Track which files need removal
-declare -a FILES_TO_REMOVE=()
+FILES_TO_REMOVE=()
 
 echo "Checking activation status..."
 
-for TARGET_FILE in "${AGENT_FILES[@]}"; do
+for TARGET_FILE in "${TARGET_FILES[@]}"; do
     FULL_PATH="$PARENT_REPO/$TARGET_FILE"
     
     if [ -L "$FULL_PATH" ]; then

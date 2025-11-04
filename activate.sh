@@ -34,20 +34,29 @@ SUBMODULE_NAME=$(basename "$PWD")
 echo "Submodule directory name: $SUBMODULE_NAME"
 echo ""
 
-# Step 3: Define agent files to symlink
-declare -A AGENT_FILES
-AGENT_FILES[".claude/commands/commit.md"]="../../$SUBMODULE_NAME/.claude/commands/commit.md"
-AGENT_FILES[".claude/agents/committer.md"]="../../$SUBMODULE_NAME/.claude/agents/committer.md"
-AGENT_FILES[".cursor/rules/interactive-commit.mdc"]="../../$SUBMODULE_NAME/.cursor/rules/interactive-commit.mdc"
-AGENT_FILES[".cursor/rules/autonomous-committer.mdc"]="../../$SUBMODULE_NAME/.cursor/rules/autonomous-committer.mdc"
+# Step 3: Define agent files to symlink (parallel arrays for bash 3.2 compatibility)
+TARGET_FILES=(
+    ".claude/commands/commit.md"
+    ".claude/agents/committer.md"
+    ".cursor/rules/interactive-commit.mdc"
+    ".cursor/rules/autonomous-committer.mdc"
+)
+
+LINK_TARGETS=(
+    "../../$SUBMODULE_NAME/.claude/commands/commit.md"
+    "../../$SUBMODULE_NAME/.claude/agents/committer.md"
+    "../../$SUBMODULE_NAME/.cursor/rules/interactive-commit.mdc"
+    "../../$SUBMODULE_NAME/.cursor/rules/autonomous-committer.mdc"
+)
 
 # Track which files need creation
-declare -A FILES_NEED_CREATION
+FILES_NEED_CREATION=()
 
 # Check each file
-for TARGET_FILE in "${!AGENT_FILES[@]}"; do
+for i in "${!TARGET_FILES[@]}"; do
+    TARGET_FILE="${TARGET_FILES[$i]}"
+    EXPECTED_LINK="${LINK_TARGETS[$i]}"
     FULL_PATH="$PARENT_REPO/$TARGET_FILE"
-    EXPECTED_LINK="${AGENT_FILES[$TARGET_FILE]}"
     
     if [ -e "$FULL_PATH" ]; then
         if [ -L "$FULL_PATH" ]; then
@@ -55,7 +64,6 @@ for TARGET_FILE in "${!AGENT_FILES[@]}"; do
             LINK_TARGET=$(readlink "$FULL_PATH")
             if [[ "$LINK_TARGET" == "$EXPECTED_LINK" ]]; then
                 echo "${GREEN}✓${NC} $TARGET_FILE already activated (correct symlink exists)"
-                FILES_NEED_CREATION[$TARGET_FILE]=false
             else
                 echo "${RED}Error: $TARGET_FILE is a symlink to a different location${NC}"
                 echo "  Current target: $LINK_TARGET"
@@ -74,7 +82,7 @@ for TARGET_FILE in "${!AGENT_FILES[@]}"; do
             exit 1
         fi
     else
-        FILES_NEED_CREATION[$TARGET_FILE]=true
+        FILES_NEED_CREATION+=("$i")
     fi
 done
 
@@ -91,27 +99,26 @@ echo ""
 CREATED_FILES=()
 ANY_CREATED=false
 
-for TARGET_FILE in "${!AGENT_FILES[@]}"; do
-    if [ "${FILES_NEED_CREATION[$TARGET_FILE]}" = true ]; then
-        if [ "$ANY_CREATED" = false ]; then
-            echo "Creating symlinks..."
-            ANY_CREATED=true
-        fi
-        
-        FULL_PATH="$PARENT_REPO/$TARGET_FILE"
-        LINK_TARGET="${AGENT_FILES[$TARGET_FILE]}"
-        
-        if ln -s "$LINK_TARGET" "$FULL_PATH" 2>/dev/null; then
-            echo "${GREEN}✓${NC} Created symlink: $TARGET_FILE -> $LINK_TARGET"
-            CREATED_FILES+=("$FULL_PATH")
-        else
-            echo "${RED}✗${NC} Failed to create symlink: $TARGET_FILE"
-            # Clean up any symlinks we created before failing
-            for CREATED in "${CREATED_FILES[@]}"; do
-                rm "$CREATED"
-            done
-            exit 1
-        fi
+for idx in "${FILES_NEED_CREATION[@]}"; do
+    if [ "$ANY_CREATED" = false ]; then
+        echo "Creating symlinks..."
+        ANY_CREATED=true
+    fi
+    
+    TARGET_FILE="${TARGET_FILES[$idx]}"
+    LINK_TARGET="${LINK_TARGETS[$idx]}"
+    FULL_PATH="$PARENT_REPO/$TARGET_FILE"
+    
+    if ln -s "$LINK_TARGET" "$FULL_PATH" 2>/dev/null; then
+        echo "${GREEN}✓${NC} Created symlink: $TARGET_FILE -> $LINK_TARGET"
+        CREATED_FILES+=("$FULL_PATH")
+    else
+        echo "${RED}✗${NC} Failed to create symlink: $TARGET_FILE"
+        # Clean up any symlinks we created before failing
+        for CREATED in "${CREATED_FILES[@]}"; do
+            rm "$CREATED"
+        done
+        exit 1
     fi
 done
 
@@ -122,7 +129,7 @@ fi
 # Step 6: Verify symlinks exist and work
 echo "Verifying activation..."
 
-for TARGET_FILE in "${!AGENT_FILES[@]}"; do
+for TARGET_FILE in "${TARGET_FILES[@]}"; do
     FULL_PATH="$PARENT_REPO/$TARGET_FILE"
     if [ -L "$FULL_PATH" ] && [ -f "$FULL_PATH" ]; then
         echo "${GREEN}✓${NC} $TARGET_FILE is active and accessible"
